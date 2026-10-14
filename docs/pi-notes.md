@@ -158,3 +158,7 @@ pi install npm:pi-web-access
 
 - [suggest-plugin.md](./suggest-plugin.md) — pi.dev 插件精选
 - [skill-recommendations.md](./skill-recommendations.md) — skills.sh / skillhub.cn skill 精选
+
+## 9. 其他速查
+
+- [slash-and-shortcuts.md](./slash-and-shortcuts.md) — 常用 slash 命令与快捷键速查表
