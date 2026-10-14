@@ -162,3 +162,4 @@ pi install npm:pi-web-access
 ## 9. 其他速查
 
 - [slash-and-shortcuts.md](./slash-and-shortcuts.md) — 常用 slash 命令与快捷键速查表
+- [pstack.md](./pstack.md) — pstack 技能包的选择、安装与使用
