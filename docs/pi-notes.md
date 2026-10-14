@@ -29,6 +29,14 @@
 - 存储目录：`~/.pi/agent/sessions/`（Windows：`C:\Users\<用户>\.pi\agent\sessions\`），按工作目录分组
 - `/session` 查看当前会话详情（路径、ID、消息数、token、费用）
 
+### 快速回顾对话（不用滚屏）
+
+- `Ctrl+↑` / `Ctrl+↓`（或 `Ctrl+Shift+↑/↓`）：全屏模式下在**你的提问之间直接跳转**
+- `Ctrl+F`（Windows）：搜索对话内容，Enter 跳下一个匹配
+- `PageUp` / `PageDown`：按页翻动对话
+- `/export`：导出 HTML，浏览器里通读长对话
+- `/tree` + 过滤键：见第 3 节的视图过滤
+
 ## 3. 会话的树结构：/tree、/fork、/clone
 
 pi 把会话存成**树**，回到早期节点不会删除后续分支。
@@ -52,6 +60,21 @@ pi 把会话存成**树**，回到早期节点不会删除后续分支。
 - 选中 **assistant 回复 / tool 结果等** → 从该节点之后继续，输入框为空
 
 跳转后发给模型的是**该节点为止的分支前缀**，旧分支后续 tool 不会自动重跑——模型基于当时状态 + 你的新指令重新决定。
+
+### /tree 视图过滤（解决 tool 条目刷屏）
+
+`/tree` 界面内直接按键过滤：
+
+| 按键 | 模式 |
+|---|---|
+| `Ctrl+T` | 隐藏所有 tool 结果（no-tools） |
+| `Ctrl+U` | 只显示你的提问（user-only）——干净的问答列表 |
+| `Ctrl+L` | 只显示标记过的条目 |
+| `Ctrl+A` | 显示全部 |
+| `Ctrl+D` | 默认视图 |
+| `Ctrl+O` / `Ctrl+Shift+O` | 循环切换 |
+
+常用组合：`/tree` → `Ctrl+U` 找问题、`Ctrl+T` 看回答。想设为默认：settings.json 加 `"treeFilterMode": "user-only"`（或 `"no-tools"`），`/reload` 生效。
 
 ### "Summarize branch?" 提示
 
