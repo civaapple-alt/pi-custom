@@ -131,6 +131,7 @@ pi install npm:pi-web-access
 - 只会话消息树不动，reload 不影响当前对话上下文
 - **settings.json 改动也能生效**：reload 会重读全局（`~/.pi/agent/settings.json`）和项目级（`.pi/settings.json`）两份配置，并重置 provider（`resetApiProviders`）。常规设置（provider、compaction、主题、行为开关）无需重启；仅个别启动期一次性读取的选项（如终端能力检测）不保证，没生效就重启
 
-## 8. 插件推荐
+## 8. 插件与 skill 推荐
 
-见 [suggest-plugin.md](./suggest-plugin.md)。
+- [suggest-plugin.md](./suggest-plugin.md) — pi.dev 插件精选
+- [skill-recommendations.md](./skill-recommendations.md) — skills.sh / skillhub.cn skill 精选
