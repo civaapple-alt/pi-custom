@@ -58,3 +58,42 @@ Persist and Resume → Task Graph → Abort and Subagents
 ## 延伸：与"可中断/可恢复运行"设计的关系
 
 Pi Durable 的 checkpoint-per-task、`replay` 安全声明、exactly-once 提交，本质是把**"运行状态可恢复、可审计"**做成架构基石。这与交互层"观察/暂停/接管"（如 pi 的 steer、Esc、会话树分支）互补：交互层解决人机节奏问题，持久化层解决可靠性问题。
+
+## 与 pi coding agent 的关系层级（辨析）
+
+**两者是平级姊妹，不是上下层**：共享 pi-ai、chord 等底层包，各自是独立产品。证据：官方说 Durable 的经验会 "flow back into the Pi coding agent"——若 Durable 是下层则不存在"回流"。
+
+```
+pi-ai / chord 等共享底座
+   ┌────┴─────┐
+pi coding agent   pi-durable
+终端应用（人用）    库/框架（开发者 import 用）
+   ↑                  ↑
+pi extensions     你自己的应用
+（装包扩展它）     （import 它构建，不是插件）
+```
+
+**不存在"用 Durable 做 pi 的 extension 再安装"这条路径**。选型互斥：
+
+| 目标 | 路径 | plan mode 的形态 |
+|---|---|---|
+| 在 pi 终端里加功能 | pi extension（`pi install` 装包） | 装在 pi 里的第三方包 |
+| 构建自己的产品（Slack 机器人/托管 agent/多用户服务） | Durable 应用（import 库写程序） | 自己应用里的一段代码（示例 27） |
+
+示例 26 甚至演示了用 Durable 造一个迷你 pi coding agent——说明它俩同层：Durable 能造出 pi agent 这类东西，而非寄生其中。
+
+## 示例为何覆盖 subagent / plan mode（示例 ≠ 内置）
+
+**纠偏**：Durable 同样不内置这些功能——博客原话 "Pi Durable has no built-in subagents, but they take a few lines of code to build"。27/22/23/24 号示例是 `test/examples/` 里的**参考实现**，是教学材料，不承诺 API 稳定、不做功能维护。
+
+**框架的示例 ≠ 产品的内置功能**。
+
+| 模式 | 在 Durable 上 | 在 pi coding agent 上 |
+|---|---|---|
+| 子代理 | harness API 几行：`createConversation`+`submit`+`wait`；并发/归属/抗崩溃免费 | 无"第二个会话循环"原语，要自己造（pi-subagents 插件是项目级实现） |
+| 子任务 | task 图原生结构，ownership 决定 abort 传播 | 无 task 概念，只有消息树 |
+| 计划模式 | `configure({tools:{remove:[...]}})` 一行切只读 + 扩展文档存计划 | 可拼（第三方 plan-mode 包），但需自建工具暴露控制 |
+
+准确说法：这些模式在 Durable 上是**原语的自然组合（composition）**，在 pi agent 上是**与 harness 搏斗（construction）**——Durable 把对话/任务/归属/checkpoint 做成了 API 表面的主角，功能便"浮现"出来。
+
+**两种"不做"是同一种哲学**（harness 做薄，模式做散）：核心只保证原语最小且完备，模式层永远留给上层。区别只在受众：pi agent 的上层是插件生态（装包），Durable 的上层是应用开发者（抄示例改吧改吧）。官方宁可写 20 个示例也不把 subagent 焊死进核心——一旦焊死就失去被改造的可能。pi coding agent 的 README 亦明言："skips features like sub-agents and plan mode. Ask Pi to build what you want, or install a package that does it your way."。
