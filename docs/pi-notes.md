@@ -163,3 +163,20 @@ pi install npm:pi-web-access
 
 - [slash-and-shortcuts.md](./slash-and-shortcuts.md) — 常用 slash 命令与快捷键速查表
 - [pstack.md](./pstack.md) — pstack 技能包的选择、安装与使用
+
+## 10. 案例：welcome 扩展从需求到删除（需求先查内置）
+
+**需求**：欢迎页只在启动/reload 时显示一次，想要个 `/welcome` 命令随时查看当前 resources，并在 reload 后核对改动是否生效。
+
+**过程**：
+
+1. 调研扩展 API：`pi.registerCommand()` 注册命令，`ctx.ui.setWidget(key, lines, {placement:"aboveEditor"})` 可在输入框上方展示文本面板（`~/.pi/agent/extensions/welcome.ts`）
+2. 实现内容：当前模型/thinking、skill 名单 + ●（自动触发）/○（显式调用）+ 来源目录、扩展文件/npm 包/settings 配置
+3. 实测可用（34 skills 全列出，来源标记正确），但 widget 有高度限制会截断长列表
+4. 用户贴出欢迎页后才发现：欢迎页提示 **"Press ctrl+o to show full startup help and loaded resources"** —— `Ctrl+O` 本身就是内置的随叫随到资源查看器（`app.tools.expand` 键位，空闲时呼出）
+5. 结论：内置 `Ctrl+O` 已覆盖需求，删掉扩展，恢复只用 `kimi-auto-router.ts`
+
+**经验**：
+
+- pi 内置能力比表面多：想要功能时先看启动帮助（`Ctrl+O`）、`/hotkeys`，或直接在会话里问 pi"有没有内置 XX"
+- `/welcome` 相对内置列表的唯一增量是 ●/○ 自动触发状态和来源目录——若将来需要验证 skill 的 `disable-model-invocation` 改动，可考虑重新加回
