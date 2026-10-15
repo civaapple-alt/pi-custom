@@ -1,6 +1,6 @@
 # 提案：Agent 执行过程的观察模式（Observe Mode）
 
-- 状态：M1 已落地（报幕指南生效中），M2 待启动
+- 状态：M1 已落地（报幕指南生效中），M2 已验证完成（2026-10），M3 待启动
 - 背景：pi 会话中的讨论（2026-10）
 
 ## 1. 问题
@@ -107,8 +107,27 @@ codemode 执行内部调用时 LLM 不在循环里，turn 边界弹暂停对话�
 | 阶段 | 内容 | 验收 |
 |---|---|---|
 | M1 | 加 `~/.pi/AGENTS.md` 报幕指南（含 codemode 批次规则，见 4.3） | ✅ 已安装并验证加载（2026-10）；待 3 个真实任务验收叙述质量 |
-| M2 | 原型验证 turn 边界阻塞 UI + `parentToolCallId` 事件流渲染（见 4.4） | 明确对话框行为与批内可见性，确定第 2 层形态 |
+| M2 | 原型验证 turn 边界阻塞 UI + `parentToolCallId` 事件流渲染（见 4.4） | ✅ 完成（见下"M2 验证结论"） |
 | M3 | 实现观察模式扩展 | 默认关，`/observe` 切换；批次摘要（支持 codemode 嵌套展开）+ 步进/跟随两种节奏 |
+
+## 6.1 M2 验证结论（已完成）
+
+探针扩展 `probe.ts`（已留档同目录）以 `PI_PROBE=1` 门控记录事件日志，验证三个问题：
+
+**1. turn 边界挂点 ✅** — `turn_end` 在每个 API turn 结束后触发（非仅 settle 前），payload 含 `turnIndex/message/toolResults/outcome` 等，批次摘要原料齐全。时序样本（间隔 8s = 一次 API 往返）：
+
+```
+before_agent_start → tool batch → turn_end → tool batch → turn_end → 文字 → turn_end → agent_before_settle
+```
+
+**2. turn 边界阻塞对话框 ✅（活体测试确认）** — 探针在 `turn_end` handler 中 `await ctx.ui.select(...)`：
+- 对话框在工具执行完、下一请求前正常弹出
+- 选择"继续"后才放行下一模型请求（用户亲眼验证，选择前 run 保持挂起）
+- **结论：按键步进形态成立**，M3 无需退化为慢速跟随
+
+**3. codemode 嵌套事件 ✅** — 嵌套 `tool_call` 事件逐条实时触发、带 `parentToolCallId`、args 全量；`turn_end` 不在嵌套调用之间触发（整个 codemode 批次 = 一个 turn，与 4.4 设计一致）。批内可见性可做"实时子步骤滚动"级。
+
+**实现细节备注**：`tool_execution_start` 比 `tool_call` 早约 3ms 触发，实时 UI 应以 `tool_call` 事件顺序为准。
 
 ## 7. 备选与参考
 
