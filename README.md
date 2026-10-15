@@ -26,6 +26,7 @@ pi coding agent 的个人知识库：使用笔记、速查表、精选清单与�
 - [durable/docs/pi-durable-notes.md](durable/docs/pi-durable-notes.md) — Pi Durable（`packages/durable`）架构解读
 - [durable/docs/durable-examples.md](durable/docs/durable-examples.md) — 官方 32 个示例（00–31）的场景目录与动手顺序
 - [durable/docs/chord-explained.md](durable/docs/chord-explained.md) — chord 通俗解读：管什么、不是什么（对比持久层/Kafka/Nacos）、生态现状
+- [durable/docs/pi-vs-codex-stacks.md](durable/docs/pi-vs-codex-stacks.md) — pi 栈 vs codex 栈分层对照：agent 引擎/harness 形态、库链接 vs 协议进程、选型推论
 
 ## 约定
 
