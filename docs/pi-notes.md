@@ -180,3 +180,55 @@ pi install npm:pi-web-access
 
 - pi 内置能力比表面多：想要功能时先看启动帮助（`Ctrl+O`）、`/hotkeys`，或直接在会话里问 pi"有没有内置 XX"
 - `/welcome` 相对内置列表的唯一增量是 ●/○ 自动触发状态和来源目录——若将来需要验证 skill 的 `disable-model-invocation` 改动，可考虑重新加回
+
+## 11. 概念辨析：session / run / turn / tool（批次）
+
+这组概念在 Observe Mode 的讨论中反复出现，层级关系：
+
+```
+session（会话，持久化的树）
+└── run（一次运行：用户输入 → agent 干完 settle）
+    └── turn（一轮：一次 LLM API 请求的响应周期）
+        └── tool call（工具调用，最小执行单元）
+```
+
+### tool（工具调用）
+
+模型可调用的最小执行单元：`read` / `bash` / `edit` / `codemode` …
+一次调用 = 一次副作用 + 一个 toolResult 记录。
+特例：codemode 是"套娃"——1 个 tool call 内部由脚本驱动多个**嵌套调用**（事件带 `parentToolCallId`，结果存父调用的 `nestedCalls`），但对 turn 结构而言仍算 1 个调用。
+
+### turn（轮次）= 一次 API 请求
+
+一次完整的 LLM 请求-响应周期。pi 的结构（M2 探针实测时序）：
+
+```
+请求 → 模型响应（文字 + 0..n 个 tool call）→ 执行工具 → 记录 toolResult
+→ turn_end 事件 → 若有待处理结果则发起下一个请求（下一个 turn）
+```
+
+- 一个 turn 内模型输出**文字 + 一批工具调用**，这批调用共享同一个意图
+- **批次（batch）= 一个 turn 内的 tool call 集合**，是 Observe Mode 的观察单元
+- `turn_end` 事件在每个 turn 结束时触发（payload 含 message/toolResults/turnIndex），挂暂停点的位置
+
+### run（运行）
+
+从一条用户输入触发、到 agent settle 的完整过程 = N 个 turn 的序列。
+
+- `before_agent_start` 事件 = run 开始；`agent_before_settle` / `agent_end` = run 收尾
+- **Esc / Observe 的"终止"作用于整个 run**；steer（插话）作用于 run 内的 turn 间
+- run 结束（settle）后，等下一条用户输入才开始新 run
+
+### session（会话）
+
+持久化的对话树（JSONL），包含多个 run 的全部消息。`/tree` 导航、`/fork` 分支都在这一层。
+
+### 对照速查
+
+| 概念 | 边界标志 | Observe Mode 的关系 |
+|---|---|---|
+| tool | 单次调用 | 摘要清单里的一行 |
+| 批次 | turn 内的全部调用 | 摘要的观察单元 |
+| turn | 一次 API 往返（`turn_end`） | **暂停点挂在这里** |
+| run | 输入到 settle | "放行到结束"的"结束"指它 |
+| session | 持久化树 | `/tree`、`/fork` 操作层 |
