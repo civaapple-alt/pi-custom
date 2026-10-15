@@ -3,87 +3,52 @@
 > pstack 是 Lauren Tan（@poteto，React Core Team / 前 Meta、Netflix、Cursor）发布的工程方法论技能包，目标是"写更少的代码，但质量更高"。
 > 本文记录 pi 环境下的选型与用法（已在本机安装验证）。
 
-## 1. 它是什么
+## 1. 选型
 
-Cursor 官方插件仓库 [`cursor/plugins/pstack`](https://github.com/cursor/plugins/tree/main/pstack) 的内容构成：
+Cursor 官方插件 [`cursor/plugins/pstack`](https://github.com/cursor/plugins/tree/main/pstack) 有 53 个 skill，但 52 个带 `disable-model-invocation: true`（纯显式调用），且包含 Cursor 专属部分（`agents/`、`automations/`、多模型分工）。
 
-```
-pstack/
-├── plugin.json      # Cursor 插件清单（pi 不支持此格式）
-├── skills/          # 53 个 SKILL.md 技能 ⭐ pi 可直接使用
-├── agents/          # Cursor 后台 agent 定义（不可移植）
-└── automations/     # Cursor 自动化（不可移植）
-```
+最终选择：**[`FetchUpstream/pstack-plugin`](https://github.com/FetchUpstream/pstack-plugin)**（ChatGPT Web 非官方精选版），理由：
 
-pi 不认 agent-plugins.org 的 plugin.json 规范；但 skills 是标准 Agent Skills 格式，pi 原生支持。
-不可移植部分：`agents/`、`automations/`，以及" grok 写代码 / opus 做评审"的多模型分工（Cursor 专属概念，pi 下由当前模型一把抓）。
+- 从上游 53 个精选 **26 个**适合纯对话场景的 skill（去掉了依赖 Cursor agent / 本地工具 / 代码执行的）
+- 保留上游可独立工作的部分（unslop、bro、technical-writing、typescript-best-practices、principle-* 等）
+- 可自定义自动触发（见下）
 
-## 2. 选型（GitHub 现状）
+备选：`backnotprop/pstack`（★1800，官方独立镜像，53 个全量）、`michael-denyer/pstack-claude`（★1967）。
 
-| 仓库 | 星标 | 说明 |
-|---|---|---|
-| **`backnotprop/pstack`** | ★1800 | 官方独立镜像，README 明确支持 Pi，与 Cursor 上游同步。**已选此仓库** |
-| `michael-denyer/pstack-claude` | ★1967 | 多 agent 移植版（含 Pi） |
-| `shrimpwtf/oh-my-pstack` | ★32 | 可移植工作流（Pi/OMP/Codex） |
-| `kkgogogo17/pi-pstack` | ★8 | Pi 原生移植，带 sticky Poteto Mode + 隔离子代理 |
+## 2. 安装（已完成）
 
-pi.dev 与 skills.sh 官方目录当时均未收录。
+pi 的专用 skill 目录（不与其他 agent 共享）：
 
-## 3. 安装（已完成）
-
-pi 扫描共享 Agent Skills 目录 `~/.agents/skills/`（各 agent 通用，Claude Code / Codex 也能用同一套）：
+- 用户级：`~/.pi/agent/skills/`
+- 项目级：`<项目>/.pi/skills/`
+- （共享的 Agent Skills 位置 `~/.agents/skills/` 本机只保留原有 8 个非 pstack skill）
 
 ```bash
-git clone --depth 1 https://github.com/backnotprop/pstack.git
-cp -r pstack/skills/* ~/.agents/skills/
-rm -rf pstack
+git clone --depth 1 https://github.com/FetchUpstream/pstack-plugin.git
+cp -r pstack-plugin/skills/* ~/.pi/agent/skills/
 ```
 
-安装结果：53 个 skill 全部就位，逐一校验 SKILL.md 存在，与原有 8 个 skill 无重名冲突。
-pi 中执行 `/reload` 后生效。
+已开启自动触发：26 个 skill 的 `disable-model-invocation` 全部为 `false`
+（8 个原本无此标记天然自动触发，18 个由 `true` 改为 `false`）。
 
-## 4. 使用
+pi 中 `/reload` 后生效。
 
-### 触发机制（重要）
+## 3. 使用
 
-上游 53 个 skill 中 **52 个带 `disable-model-invocation: true`**（唯一例外 `setup-pstack`）：
-- 不会自动触发，只能**显式调用** `/skill:<name>`
-- 由 `/skill:poteto-mode` 的 playbook 调度时不受影响（playbook 直接指示读取磁盘上的 SKILL.md 文件）
+- **自动触发**：描述匹配场景时模型自行加载（如写文档触发 technical-writing、改 TS 触发 typescript-best-practices）
+- **显式调用**：`/skill:unslop`、`/skill:architect`、`/skill:principle-<名>` 等
+- 全部 26 个：architect、blast-radius、bro、how、unslop、technical-writing、typescript-best-practices、principle-*（约 18 个）等，见 `~/.pi/agent/skills/`
 
-这是 pstack 的编排哲学：不靠模型自动路由，靠 poteto-mode 统一调度，避免 50+ skill 干扰模型选择。
+注意：此精选版**不含** `poteto-mode` / `setup-pstack` / `tdd` / `swarm` 等编排类 skill——它们依赖 Cursor 的 agent 机制，被作者有意排除。若需要 poteto-mode 工作流，可再装 `backnotprop/pstack` 补入（会回到显式调用模式）。
 
-### 入门两步
-
-1. `/skill:setup-pstack` —— 选推理预算、配置模型分工偏好
-2. 任务开头用 `/skill:poteto-mode <任务描述>` —— 主入口，23 个 playbook（investigation / bug-fix / perf / hillclimb / ...）自动选路
-
-### 常用单点技能（显式调用）
-
-| 场景 | 命令 |
-|---|---|
-| 测试驱动修 bug | `/skill:tdd` |
-| 清理啰嗦表达 | `/skill:unslop` |
-| 注释纪律 | `/skill:no-comments` |
-| 技术写作标准（Diátaxis + Google style） | `/skill:technical-writing` |
-| 架构设计（深模块） | `/skill:architect` |
-| 代码评审 | `/skill:correct` |
-| 根因追问 | `/skill:why` |
-| 28 个工程原则 | `/skill:principle-<名称>` |
-
-完整清单见 `~/.agents/skills/` 目录。
-
-### 想改自动触发？
-
-改对应 SKILL.md frontmatter 一行即可：
+## 4. 管理
 
 ```bash
-sed -i 's/^disable-model-invocation: true/disable-model-invocation: false/' ~/.agents/skills/<名字>/SKILL.md
+# 查看
+ls ~/.pi/agent/skills/
+
+# 关闭某个 skill 的自动触发
+sed -i 's/^disable-model-invocation: false/true/' ~/.pi/agent/skills/<名>/SKILL.md
+
+# 升级：重新 clone 覆盖
 ```
-
-注意：当前本机保持上游默认（全部显式调用），未做改动。
-
-## 5. 注意事项
-
-- 多模型评审分工在 pi 里不会自动映射，流程仍可用，只是单模型执行
-- 个别 skill 可能引用 Cursor 特有命令，遇到再微调（纯 markdown，好改）
-- 升级方式：重新 clone 覆盖 `~/.agents/skills/` 中对应目录
