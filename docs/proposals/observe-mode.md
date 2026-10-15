@@ -61,21 +61,56 @@ pi 的 agent loop 全自动执行：一次 LLM 请求 → 一批 tool 调用 →
 
 需原型验证后确定。
 
-## 4. 非目标
+## 4. 与 codemode 的交互
+
+pi 的 codemode（模型写 JS 脚本在沙箱里批量驱动内部工具调用）对观察模式的影响，源码核实后的结论：**不破坏设计，且提供了 batch 级观察所需的内部可见性**。
+
+### 4.1 Turn 粒度：暂停点变少但每个更大
+
+codemode 把多次 API 往返压缩为 1 次调用，turn_end 暂停点变稀疏。但 codemode 脚本本身就是按意图分组的批次（写脚本时自然先确定"这一步干什么"），与提案"观察单元 = 一批"的判断更契合。代价：一个脚本内可能混多个子意图，需要批次内部可见性（见 4.2）补充。
+
+### 4.2 批次内部可见性（关键发现）
+
+- 嵌套调用**会触发 `tool_call` / `tool_execution_*` 事件，带 `parentToolCallId`**——"不出现在 transcript"指不落盘为独立条目，事件层完全可观测
+- 脚本结束后，内部调用以 `nestedCalls` 形式**持久化在父 toolResult**（含 name/arguments/usage）
+
+因此批次摘要可以展开内部：
+
+```
+── Step 3 ─────────────────────────────
+目标: 侦察 pstack 上游结构（模型叙述）
+工具: codemode
+  ├─ read  cursor-plugins/pstack/plugin.json
+  ├─ read  pstack/skills/show-me-your-work/SKILL.md
+  └─ bash  curl api.github.com/... (star 数对比)
+────────────────────────── [回车继续]
+```
+
+### 4.3 报幕指南需补充 codemode 规则
+
+现有草案"每次调用工具前说明目标/工具/原因"对 codemode 会失效（调用的是 1 个 codemode，内部工具在脚本里）。补充规则：
+
+> 用 codemode 做批量操作前，叙述覆盖整批：这批要做什么、涉及哪些工具。脚本首行注释写明目标。
+
+### 4.4 时序细节（并入 M2 验证）
+
+codemode 执行内部调用时 LLM 不在循环里，turn 边界弹暂停对话框时脚本已跑完——"等批次结束再暂停"天然成立。但**批内步进做不到**（脚本执行不经过模型），对批内的细粒度观察只能靠事件流做"实时渲染/事后回放"。M2 原型需确认 `parentToolCallId` 事件流的 UI 渲染效果。
+
+## 5. 非目标
 
 - ❌ 审批/拦截 tool 调用（approve 方向）——pi 扩展 API 其实支持（`tool_call` 事件可 block / 改参数 / terminate），但那是另一个提案
 - ❌ 暂停/续播单条流（token 级暂停）——LLM API 底层不支持，见 pi-notes 相关讨论
 - ❌ 改动 pi 核心——以扩展 + context 文件实现，保持可拆卸
 
-## 5. 里程碑
+## 6. 里程碑
 
 | 阶段 | 内容 | 验收 |
 |---|---|---|
-| M1 | 加 `~/.pi/AGENTS.md` 报幕指南 | 跑 3 个真实任务，每个含工具的 turn 都有 1-2 句叙述 |
-| M2 | 原型验证 turn 边界阻塞 UI | 明确对话框在运行中的行为，确定第 2 层形态 |
-| M3 | 实现观察模式扩展 | 默认关，`/observe` 切换；批次摘要 + 步进/跟随两种节奏 |
+| M1 | 加 `~/.pi/AGENTS.md` 报幕指南（含 codemode 批次规则，见 4.3） | 跑 3 个真实任务，每个含工具的 turn 都有 1-2 句叙述 |
+| M2 | 原型验证 turn 边界阻塞 UI + `parentToolCallId` 事件流渲染（见 4.4） | 明确对话框行为与批内可见性，确定第 2 层形态 |
+| M3 | 实现观察模式扩展 | 默认关，`/observe` 切换；批次摘要（支持 codemode 嵌套展开）+ 步进/跟随两种节奏 |
 
-## 6. 备选与参考
+## 7. 备选与参考
 
 - 现成插件 `@gotgenes/pi-permission-system`（审批方向，与本提案互补不冲突）
 - pi 已有控制手段：Esc 中断（run 级）、steer（turn 内插话）——观察模式填补的是"事前/事中的可读性"，三者正交
