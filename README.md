@@ -19,6 +19,12 @@ pi coding agent 的个人知识库：使用笔记、速查表、精选清单与�
 
 `docs/proposals/` 放功能提案：问题 → 设计判断 → 可行性验证 → 里程碑。Observe Mode 是首个完整样本（M1 报幕 ✅ / M2 验证 ✅ / M3 实现 ⏳）。
 
+## 源码研读
+
+`durable/docs/` 放 pi 官方仓库源码的研读笔记（不动官方克隆，`D:\gh-ws\pi` 仅作只读参考）。当前：
+
+- [durable/docs/pi-durable-notes.md](durable/docs/pi-durable-notes.md) — Pi Durable（`packages/durable`）架构解读
+
 ## 约定
 
 - 本仓库只放 markdown，代码归 [pi-extensions](https://github.com/civaapple-alt/pi-extensions)
