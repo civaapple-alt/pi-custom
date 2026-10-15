@@ -108,11 +108,11 @@ codemode 执行内部调用时 LLM 不在循环里，turn 边界弹暂停对话�
 |---|---|---|
 | M1 | 加 `~/.pi/AGENTS.md` 报幕指南（含 codemode 批次规则，见 4.3） | ✅ 已安装并验证加载（2026-10）；待 3 个真实任务验收叙述质量 |
 | M2 | 原型验证 turn 边界阻塞 UI + `parentToolCallId` 事件流渲染（见 4.4） | ✅ 完成（见下"M2 验证结论"） |
-| M3 | 实现观察模式扩展（`observe.ts`，已留档同目录） | ⏳ 已实现，待真实任务验收：批次摘要 + codemode 嵌套展开 + 继续/放行/终止三选 |
+| M3 | 实现观察模式扩展（代码在 [pi-extensions 仓库](https://github.com/civaapple-alt/pi-extensions) `extensions/observe.ts`） | ⏳ 已实现，待真实任务验收：批次摘要 + codemode 嵌套展开 + 继续/放行/终止三选 |
 
 ## 6.1 M2 验证结论（已完成）
 
-探针扩展 `probe.ts`（已留档同目录）以 `PI_PROBE=1` 门控记录事件日志，验证三个问题：
+探针扩展 `probe.ts`（代码在 [pi-extensions 仓库](https://github.com/civaapple-alt/pi-extensions) `extensions/probe.ts`）以 `PI_PROBE=1` 门控记录事件日志，验证三个问题：
 
 **1. turn 边界挂点 ✅** — `turn_end` 在每个 API turn 结束后触发（非仅 settle 前），payload 含 `turnIndex/message/toolResults/outcome` 等，批次摘要原料齐全。时序样本（间隔 8s = 一次 API 往返）：
 
