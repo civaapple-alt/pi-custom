@@ -24,6 +24,7 @@ pi coding agent 的个人知识库：使用笔记、速查表、精选清单与�
 `durable/docs/` 放 pi 官方仓库源码的研读笔记（不动官方克隆，`D:\gh-ws\pi` 仅作只读参考）。当前：
 
 - [durable/docs/pi-durable-notes.md](durable/docs/pi-durable-notes.md) — Pi Durable（`packages/durable`）架构解读
+- [durable/docs/durable-examples.md](durable/docs/durable-examples.md) — 官方 32 个示例（00–31）的场景目录与动手顺序
 
 ## 约定
 
