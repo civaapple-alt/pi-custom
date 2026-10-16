@@ -103,6 +103,49 @@ pending / running / waiting(on[], JoinPolicy) → completed / failed / aborted /
 
 源码对应（`src/harness/`）：`harness.ts`、`submissions.ts`、`inbox.ts`、`task-graph.ts`、`agent.ts`、`compaction.ts`、`scheduler.ts`。
 
+## 实验实证：02-jsonl-ledger 跑出来的五件事
+
+以 `durable-practice/examples/00-conversation-extend/02-jsonl-ledger.ts` 的实测输出与 `session-data/*.jsonl` 账本为依据，验证 spec 概念如何落到文件：
+
+### 1. commit = 原子打包（不变量 1 的物证）
+
+`main.jsonl` 每行一个 commit，seq 递增。代码 ②③ 各做一次"entry + 文档变更"，账本上体现为同一 seq 的 `writes` 数组打包两个写入——**一次 commit 的 writes 就是原子单元**，失败即整行不存在。
+
+### 2. entry 与 document 的分工（双文件结构）
+
+- `main.jsonl`：`entry`（不可变事实，append-only）+ `document.create/change`（记录"哪个文档变了"，不含内容）
+- `doc-N.jsonl`：该文档的 **chord 操作流**（内容本体）
+
+分工：**entry 记"发生过什么"（永不改），document 记"现在是什么"（base+delta 演进）**。关联点是 commit seq——两者经 commit 绑定。
+
+### 3. base / delta 是存储编码，不是 API
+
+代码里只有 `(await tx.doc(notes, id)).text = "第二笔"`（对普通 JS 对象赋值）。`kind: "base"`/`"delta"` 是 commit 时 chord 的 diff tracker 自动选择：首次写入无旧版 → 全量 base；后续修改 → 最小差异 ops（如 `["s",["text"],"第二笔"]`）。**赋值是用户的事，diff 是库的事**。
+
+### 4. history 两档语义（修正此前表述）
+
+此前说"JSONL 后端默认最小保留"——**准确说法是 `history` 声明决定保留策略**（`src/storage/memory.ts` 的 `isCurrentOnly` 铁证）：
+
+| `defineDoc` 的 `history` | 存储行为 | `snapshotAsOf`（时间旅行） |
+|---|---|---|
+| `"latest"` | base+delta，旧 base 可折叠回收 | ❌ 拒绝（"does not retain historical content"） |
+| `"rewindable"` | 全量修订保留 | ✅ 可用（API 参数类型 `RewindableConversationDocToken` 编译期约束） |
+
+实验中的 `demo.notes` 声明为 `latest` 却调 `snapshotAsOf`——运行期撞墙，正好验证该约束。取舍：**latest = 日志式文档**（聊天记录、inbox，历史是垃圾），**rewindable = 状态式文档**（计划、配置，时间旅行是合法需求），代价是体积只增不减。
+
+### 5. seq 是全局账本坐标
+
+entry、document、conversation 共用同一 seq 序列（`main.jsonl` 的 seq=1,2,3；`doc-4.jsonl` 的 seq=2,3 对应同两次 commit）——**seq 即"时间"**，`snapshotAsOf(entryId)` 本质是"解析 entry 的 commit seq，回放文档操作到该 seq"。
+
+### API 备忘（实验踩坑，官方示例走 src 所以不触发）
+
+| 误 | 正 |
+|---|---|
+| `session.scanConversations(...)` | `session.commit(tx => tx.scanConversations(...))`——扫描也在事务里 |
+| `import { jsonlStorage } from "pi-durable"` | `import { openNodeJsonlStorage } from "pi-durable/storage/jsonl/node"`——存储后端在 exports 子路径 |
+| `tx.set(doc, id, v)` | `tx.doc(doc, id)` 取可编辑副本，commit 时保存 |
+| `scanEntries({ conversation: id })` | `scanEntries({ conversationId: id })`——字段名以 spec 为准 |
+
 ## 同名概念对照：durable vs pi coding agent
 
 两个家族共享术语但定义强度不同——pi coding agent 的概念是**交互产品里的记账单位**，durable 的同名概念是**有 spec 保证的持久化实体**（有不变量背书）。混淆点集中在四个词：
