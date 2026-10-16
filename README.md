@@ -32,3 +32,7 @@ pi coding agent 的个人知识库：使用笔记、速查表、精选清单与�
 
 - 本仓库只放 markdown，代码归 [pi-extensions](https://github.com/civaapple-alt/pi-extensions)
 - 文档中的本机路径一律用占位符（如 `C:\Users\<用户>\`），不出现真实路径
+
+## 动手实验
+
+- [durable-practice/](durable-practice/) — durable/chord 动手实验：官方示例 00–06（npm 包直跑，无需构建 pi 仓库），每个示例附"操作 → 执行过程 → 结果解释 → 涉及概念 → 动手改"

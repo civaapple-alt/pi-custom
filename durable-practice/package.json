@@ -1,0 +1,21 @@
+{
+  "name": "durable-practice",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "example": "examples"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@earendil-works/chord": "^1.3.0",
+    "@earendil-works/pi-durable": "^1.3.0",
+    "typebox": "^1.3.37"
+  }
+}

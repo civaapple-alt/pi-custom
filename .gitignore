@@ -1,2 +1,3 @@
 pi-extensions/
-durable-examples/
+node_modules/
+dist/
