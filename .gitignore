@@ -1,3 +1,3 @@
 pi-extensions/
 node_modules/
-dist/durable-practice/session-data/
+durable-practice/session-data/

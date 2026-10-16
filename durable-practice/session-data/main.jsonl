@@ -1,3 +1,0 @@
-{"format":1,"type":"commit","seq":8,"writes":[{"type":"conversation","value":{"id":11}}]}
-{"format":1,"type":"commit","seq":9,"writes":[{"type":"entry","value":{"kind":"note","data":"第一笔","id":12,"conversationId":11}},{"type":"document.create","record":{"id":13,"kind":"demo.notes","scope":{"kind":"conversation","conversationId":11},"history":"latest","fork":"current"},"ordinal":0}]}
-{"format":1,"type":"commit","seq":10,"writes":[{"type":"entry","value":{"kind":"note","data":"第二笔","id":14,"conversationId":11}},{"type":"document.change","id":13,"ordinal":0}]}
