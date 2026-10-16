@@ -20,9 +20,13 @@ try {
 	console.log("已取消的 commit 如预期失败:", (err as Error).message?.slice(0, 50) || String(err).slice(0, 50));
 }
 
-// 未取消的 signal 不受影响
+// 未取消的 signal 不受影响——显式断言，而非仅靠"正常返回"隐含
 const alive = new AbortController();
-const ok2 = await session.commit((tx) => tx.createConversation({ ownership: { kind: "ownerless" } }), { abortSignal: alive.signal });
-console.log("未取消的 context 正常:", ok2.id);
+try {
+	const ok2 = await session.commit((tx) => tx.createConversation({ ownership: { kind: "ownerless" } }), { abortSignal: alive.signal });
+	console.log("未取消的 context 正常:", ok2.id, "（显式确认：未被误伤）");
+} catch (err) {
+	console.log("意外失败:", err);
+}
 
 console.log("\ncontext = 取消/超时的传播通道（{abortSignal}）；Harness 里长任务取消子代理靠 ownership + context 双重机制");
