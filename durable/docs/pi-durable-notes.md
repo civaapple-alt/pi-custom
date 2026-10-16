@@ -193,6 +193,40 @@ transcript 里的**单条不可变记录**。源码定义的类型（`src/entrie
 
 源码对应：`src/entries.ts`（类型定义）、`src/session/`（conversation/transcript 作用域）、`src/harness/agent.ts`（run 如何写入 entry）。
 
+## 词条辨析：durable 的 task 与 pi 的 run 是同一粒度吗？
+
+**不是——这是 durable 设计里最微妙的粒度错位**（依据 spec 第 1、8 章）：
+
+### 三个粒度的对照
+
+| durable | pi agent | 粒度 |
+|---|---|---|
+| **run**（一次输入 → 最终答复的 turn 序列） | **run** | 相同：都是"回合"概念 |
+| **内置 task**（`GenerationTask` / `ToolTask` / `CompactionTask`，spec 第 8 章） | **turn** | 相同：都是"一次模型请求 + 其工具批次" |
+| **通用 task**（示例 24 的 checkout 收款、任意业务状态机） | —（无对应物） | durable 独有 |
+
+### 命名错位
+
+```
+pi agent:  run ⊃ turn ⊃ tool call        （run 大，turn 居中）
+durable:   run ⊃ task(内置) ⊃ tool call   （task 小，与 turn 同位）
+           另有一个大粒度 task（通用/业务级）
+```
+
+pi 的 "turn" 在 durable 里叫 "task"——因为 durable 把一切都统一成 task 状态机（模型请求是 task、工具调用是 task、业务逻辑也是 task），**粒度对齐靠"内置 vs 通用"区分，而不是靠起两个名字**。
+
+### 为什么容易把 task 和 run 对上
+
+durable 给内置 task 设置了**自动续接**：一次 run 里第一个 GenerationTask 完成后，其产出自动 spawn 下一个（tool call → ToolTask → 结果 → 下一个 GenerationTask），一路链到最终答复。这个链的视觉感受就是"一个 run"——**大脑把"链"当成了实体，而实体是链上每个 task**。
+
+### 通用 task 才是 durable 独有的王牌
+
+pi agent 的 run 永远是 "agent 回合"；durable 的通用 task 是**任意业务状态机**：收款、定时任务、人工审批节点——与模型请求**活在同一个 task 图里**，共享 checkpoint / ownership / abort 语义。这就是 durable 能编排"agent + 非 agent"混合流程而 pi agent 不能的原因。
+
+### 一句话修正
+
+> "task 和 run 类似" → 修正为：**内置 task ≈ pi 的 turn；run 两边同义；通用 task 在 pi agent 里没有对应物**——它是把"任务"从 agent 回合里解耦出来后的泛化。
+
 ## 延伸：与"可中断/可恢复运行"设计的关系
 
 Pi Durable 的 checkpoint-per-task、`replay` 安全声明、exactly-once 提交，本质是把**"运行状态可恢复、可审计"**做成架构基石。这与交互层"观察/暂停/接管"（如 pi 的 steer、Esc、会话树分支）互补：交互层解决人机节奏问题，持久化层解决可靠性问题。
