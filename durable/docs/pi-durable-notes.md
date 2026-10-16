@@ -122,6 +122,41 @@ pending / running / waiting(on[], JoinPolicy) → completed / failed / aborted /
 
 同名的 session/run/turn，在 durable 里是带不变量的**持久化合同**；在 pi coding agent 里是**交互体验约定**。读 durable spec 时用 pi 的直觉做起点可以，但要随时用不变量校准强度。
 
+## 词条：inbox / submission / task / checkpoint
+
+四个词撑起 durable 的可靠性模型，精确含义（依据 spec 第 5、6 章）：
+
+### submission（提交）
+
+一条输入/写入的**可等待句柄**。向 conversation 发消息 = 创建 submission；宿主拿到可 await 的对象，对话应答后它 settle。`requestId` 保证**恰好一次**——客户端崩溃重试拿到的是原 submission，不会执行两次。
+
+### inbox（收件箱）
+
+对话忙时（run 进行中），后来的 submission **排队进一个持久化的内置文档**（有序列表），三种 mode：`steer`（插话，下 turn 前注入）/ `followUp`（后续，run 结束后注入）/ `write`（扩展写条目）。它是个 document——所以排队状态本身也抗崩溃，进程死了重启后队列原样还在。
+
+对照 pi agent：steer/follow-up 只是内存队列，Esc 后退回输入框；durable 里它们是**落盘的合同**。
+
+### task（任务）
+
+挂在某个 conversation 上的**耐用状态机**。模型请求、工具调用、harness 运行的一切都是 task。状态机：
+
+```
+pending / running / waiting(on[], JoinPolicy)
+    → completed / failed / aborted / orphaned / faulted
+```
+
+- `waiting`：挂起等待某批 task 终态，再于 checkpoint 恢复（`failFast` / `allSettled`）
+- 归属（ownership）决定 abort 的传播：task 持有的子对话/子任务随父 abort 级联
+- 无内置子代理——但工具拿到 harness API 几行就能造（子代理 = 它拥有的子 conversation）
+
+### checkpoint（检查点）
+
+task 的**持久化状态快照**，每步先行落盘。崩溃恢复 = 重开 Session → 找到未完成的 task → 各自从最后 checkpoint 继续：被截断的模型请求重发；工具按 `replay` 声明决定重跑或报告中断。
+
+四者的关系：**submission 进 inbox 排队 → 被 run（task 的一种）消费 → run 的每一步先写 checkpoint → 崩溃后从 checkpoint 重建 task、从 inbox 重建队列**。环环相扣，缺一个可靠性就漏一块。
+
+源码对应：`src/harness/submissions.ts`、`inbox.ts`、`task-graph.ts`、`scheduler.ts`。
+
 ## 延伸：与"可中断/可恢复运行"设计的关系
 
 Pi Durable 的 checkpoint-per-task、`replay` 安全声明、exactly-once 提交，本质是把**"运行状态可恢复、可审计"**做成架构基石。这与交互层"观察/暂停/接管"（如 pi 的 steer、Esc、会话树分支）互补：交互层解决人机节奏问题，持久化层解决可靠性问题。
