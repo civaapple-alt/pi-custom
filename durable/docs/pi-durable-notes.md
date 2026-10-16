@@ -55,6 +55,54 @@ Persist and Resume → Task Graph → Abort and Subagents
 
 注意：包头部有 **Experimental** 警告，API 版本间不保证兼容。
 
+## 核心概念（依据 `docs/spec.md` 第 1 章 Terms）
+
+```
+Session（唯一变异线，原子提交单位）
+├── conversation（transcript 作用域，可 fork）
+│   └── run → turn（assistant 响应 + 其工具调用；turn 边界在 turns 之间）
+├── entry（不可变 transcript 记录，提交后永不修改/复用 ID）
+├── task（挂在某 conversation 上的耐用状态机）
+├── submission（awaitable 宿主对象的后台记录，排队进 inbox）
+└── document（可变 JSON 状态，由 Chord 操作 + 全量 base 表示）
+```
+
+逐条与 chord 的边界：**Session 才握 harness 语义**（会话/任务/checkpoint/submission/inbox），chord 只管 document 的表示与同步（Session 通过 source 把已提交的文档变更暴露给 chord，不暴露可变对象）。
+
+### 必备不变量（spec 第 1 章，8 条）
+
+1. 一次 Session commit 跨所有记录与文档写入**原子**
+2. 文档更新仅在存储 commit 成功后发布
+3. **所有可见进度皆耐用**——不存在易失发布路径
+4. 外部副作用（网络/文件/子进程）不在 Session 变异事务内运行
+5. entry 与 ID 不可变，提交后不复用
+6. 文档 draft 在事务回调结束时全量撤销/落定
+7. 变异线贯穿存储结算与已提交状态采用
+8. 存储错误对打开的 Session **致命**（发布 nothing，必须重开）
+
+### task 状态机（spec 第 5 章）
+
+```
+pending / running / waiting(on[], JoinPolicy) → completed / failed / aborted / orphaned / faulted
+```
+
+- `waiting`：停在某批 task 全部终态后于 checkpoint 恢复（`failFast` / `allSettled` 两种汇合策略）
+- checkpoint 是每步先行落盘的状态，构成"崩溃续跑"的基础
+
+### submission 与 inbox（spec 第 6 章）
+
+- submission 支持 awaitable 宿主对象；入队由 Harness 内部管理，排队项存在内置 **inbox 文档**（有序列表，tag 区分 `steer` / `followUp` / `write`）
+- 对话忙时（run 活跃）提交入队；run 任务用 `tx.settleSubmission()` 结算它应答的输入
+
+### 明确的非目标（spec 第 13 章，节选）
+
+- 无 CRDT/离线多写者合并（单 Session 单写者）
+- 无自动 checkpoint 启发式、无自动第三方 view 挂载
+- 无会话级可回滚文档、无 JSONL 全局压实/自动损坏修复
+- 无进程内强制终止不协作的扩展代码
+
+源码对应（`src/harness/`）：`harness.ts`、`submissions.ts`、`inbox.ts`、`task-graph.ts`、`agent.ts`、`compaction.ts`、`scheduler.ts`。
+
 ## 延伸：与"可中断/可恢复运行"设计的关系
 
 Pi Durable 的 checkpoint-per-task、`replay` 安全声明、exactly-once 提交，本质是把**"运行状态可恢复、可审计"**做成架构基石。这与交互层"观察/暂停/接管"（如 pi 的 steer、Esc、会话树分支）互补：交互层解决人机节奏问题，持久化层解决可靠性问题。
