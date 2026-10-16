@@ -5,7 +5,8 @@
 ## 快速开始
 
 ```bash
-cd D:\code\pi-ws\pi-custom\durable-practice
+# 在 pi-custom 仓库根目录下
+cd durable-practice
 npm install          # 已装好则跳过
 node examples/00-conversation.ts
 node examples/01-documents.ts
