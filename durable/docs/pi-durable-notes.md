@@ -103,6 +103,25 @@ pending / running / waiting(on[], JoinPolicy) → completed / failed / aborted /
 
 源码对应（`src/harness/`）：`harness.ts`、`submissions.ts`、`inbox.ts`、`task-graph.ts`、`agent.ts`、`compaction.ts`、`scheduler.ts`。
 
+## 同名概念对照：durable vs pi coding agent
+
+两个家族共享术语但定义强度不同——pi coding agent 的概念是**交互产品里的记账单位**，durable 的同名概念是**有 spec 保证的持久化实体**（有不变量背书）。混淆点集中在四个词：
+
+| 概念 | pi coding agent（交互产品，见 pi-notes 第 11 节） | pi Durable（spec 第 1 章） |
+|---|---|---|
+| **session** | JSONL 会话文件 = 一棵消息树；进程死了文件还在，但**正在跑的 run 会丢** | Session = 唯一变异线，原子提交单位；**所有可见进度皆耐用**（不变量 3），崩溃后 resume 从断点继续 |
+| **run** | 用户输入 → settle 的过程，N 个 turn；无持久化承诺，中断=计划丢失 | 从 admitted input 到 final answer 的 turn 序列，**run 本身是 durable task**——每个 turn 一个 checkpoint，中断可续 |
+| **turn** | 一次 API 往返（响应+工具执行）；模型可以自由多批次 | spec 定义相同（一次 assistant 响应 + 其工具调用），但 turn **边界是持久化边界**：之间可挂暂停/提交点 |
+| **副作用（side effect）** | 直接执行：工具调用即副作用，无重放语义；Esc 中止后状态可能半提交 | 不变量 4：**外部副作用不跑在 Session 变异事务内**；工具声明 `replay: "safe"` 才可崩溃后重跑，否则向模型报告中断、绝不盲重跑 |
+| **排队消息** | steer/follow-up 内存队列，中止后退回输入框 | submission 记录进 inbox 文档（持久化），settle 恰好一次（requestId） |
+
+### 一句话区分
+
+- pi coding agent：概念服务**人**（对话、回滚、分支）
+- durable：概念服务**可靠性**（每条概念都有"崩溃后世界长什么样"的答案）
+
+同名的 session/run/turn，在 durable 里是带不变量的**持久化合同**；在 pi coding agent 里是**交互体验约定**。读 durable spec 时用 pi 的直觉做起点可以，但要随时用不变量校准强度。
+
 ## 延伸：与"可中断/可恢复运行"设计的关系
 
 Pi Durable 的 checkpoint-per-task、`replay` 安全声明、exactly-once 提交，本质是把**"运行状态可恢复、可审计"**做成架构基石。这与交互层"观察/暂停/接管"（如 pi 的 steer、Esc、会话树分支）互补：交互层解决人机节奏问题，持久化层解决可靠性问题。
