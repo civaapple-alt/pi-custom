@@ -157,6 +157,42 @@ task 的**持久化状态快照**，每步先行落盘。崩溃恢复 = 重开 S
 
 源码对应：`src/harness/submissions.ts`、`inbox.ts`、`task-graph.ts`、`scheduler.ts`。
 
+## 词条：conversation / transcript / entry
+
+durable 数据模型的三件套（依据 spec 第 1、2 章）：
+
+### conversation（对话）
+
+一个 **transcript 作用域**，可 fork 另一个对话。它不只是消息列表，还承载：
+
+- 自己的 **agent 配置**：模型、思考档、启用的扩展与工具、额外指令、执行环境的工作目录
+- 自己的文档集（inbox、计划、自定义状态）
+- 归属（ownership）：决定 abort 传播范围——ownerless 的（如 Slack thread）abort 打不到它
+
+fork = 新作用域看到父历史到分叉点为止，**不复制**（零拷贝派生）。
+
+### transcript（会话记录）
+
+对话内的**不可变记录序列**——不是"消息数组"这种内存结构，而是 append-only 的持久化账本。一次 run 写入的 turns、entries 按提交顺序排列；fork 的 transcript 与父共享前缀。
+
+### entry（条目）
+
+transcript 里的**单条不可变记录**。源码定义的类型（`src/entries.ts`）：
+
+- `UserEntry` / `AssistantEntry` / `ToolResultEntry` —— 消息类
+- `SystemEntry` —— 系统提示词与工具变更
+- `CompactionEntry` —— 压缩摘要（保留边界）
+- `ResetEntry` —— handoff/重置
+- `CustomEntry` —— 扩展自己的 durable 数据（`pi.appendEntry()`，由 entry renderer 渲染，不进模型上下文——pi 的 observe 扩展信息流模式用的就是它）
+
+另外 task 的落盘足迹（TaskStart/TaskEnd/Checkpoint 等）由 `src/tasks.ts` 的 task 状态机管理。
+
+不变量 5：**entry 与 ID 不可变，提交后永不修改、ID 不复用**——写错了只能追加新 entry 声明废弃（与 pstack 的 append-only 决策日志同一哲学）。
+
+三者的关系：**conversation 拥有 transcript；transcript 由 entry 组成；entry 不可变**。因此 fork（共享前缀零拷贝）、resume（重放 entry 重建状态）、审计（append-only 即完整历史）在 durable 里都是这个结构的直接推论。
+
+源码对应：`src/entries.ts`（类型定义）、`src/session/`（conversation/transcript 作用域）、`src/harness/agent.ts`（run 如何写入 entry）。
+
 ## 延伸：与"可中断/可恢复运行"设计的关系
 
 Pi Durable 的 checkpoint-per-task、`replay` 安全声明、exactly-once 提交，本质是把**"运行状态可恢复、可审计"**做成架构基石。这与交互层"观察/暂停/接管"（如 pi 的 steer、Esc、会话树分支）互补：交互层解决人机节奏问题，持久化层解决可靠性问题。
